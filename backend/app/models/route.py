@@ -18,6 +18,11 @@ class Preference(str, Enum):
     BALANCED = "balanced"
 
 
+class Coords(BaseModel):
+    lat: float
+    lon: float
+
+
 class RouteSegment(BaseModel):
     mode: TransportMode
     from_location: str
@@ -29,6 +34,8 @@ class RouteSegment(BaseModel):
     departure_time: Optional[str] = None
     arrival_time: Optional[str] = None
     notes: Optional[str] = None
+    from_coords: Optional[Coords] = None
+    to_coords: Optional[Coords] = None
 
 
 class ComposedRoute(BaseModel):

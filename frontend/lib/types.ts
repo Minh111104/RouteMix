@@ -1,5 +1,11 @@
 export type TransportMode = 'drive' | 'transit' | 'flight' | 'walk' | 'rideshare';
 export type Preference = 'cheap' | 'fast' | 'balanced';
+export type SortFilter = 'all' | 'cheap' | 'fast' | 'transfers';
+
+export interface Coords {
+  lat: number;
+  lon: number;
+}
 
 export interface RouteSegment {
   mode: TransportMode;
@@ -12,6 +18,8 @@ export interface RouteSegment {
   departure_time?: string;
   arrival_time?: string;
   notes?: string;
+  from_coords?: Coords;
+  to_coords?: Coords;
 }
 
 export interface ComposedRoute {
@@ -28,7 +36,7 @@ export interface ComposedRoute {
 export interface SearchRequest {
   origin: string;
   destination: string;
-  departure_time: string; // ISO 8601
+  departure_time: string;
   preference: Preference;
 }
 
