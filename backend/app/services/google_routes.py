@@ -115,7 +115,9 @@ async def get_transit_route(
         resp = await client.post(ROUTES_API_URL, json=payload, headers=headers, timeout=15.0)
 
     if resp.status_code != 200:
-        logger.warning("Transit route failed (%s): %s", resp.status_code, resp.text[:200])
+        # 400 usually means no transit network connects these locations (expected for long routes)
+        level = logger.debug if resp.status_code == 400 else logger.warning
+        level("Transit route failed (%s): %s", resp.status_code, resp.text[:200])
         return None
 
     routes = resp.json().get("routes", [])
