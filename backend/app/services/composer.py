@@ -1,14 +1,14 @@
 import asyncio
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from app.models.route import ComposedRoute, RouteSegment, SearchRequest, TransportMode
-from app.services.google_routes import geocode_address, get_driving_route, get_transit_route
-from app.services.amadeus import get_access_token, find_airports_near, search_flights
+from app.services.google_routes import get_driving_route, get_transit_route
+from app.services.serpapi import search_flights
 
 logger = logging.getLogger(__name__)
 
-# Rideshare estimate: $1.50/km, average 40 km/h in city
+# Rideshare fallback estimate
 _RIDESHARE_COST_PER_KM = 1.50
 _RIDESHARE_SPEED_KMH = 40
 
@@ -72,134 +72,132 @@ async def _build_transit_only(
     )
 
 
+async def _build_one_fly_route(
+    origin: str,
+    destination: str,
+    departure_time: str,
+    flight: dict,
+    google_key: str,
+) -> Optional[ComposedRoute]:
+    """Build a single drive+fly+transit/rideshare route for one flight offer."""
+    orig_airport = flight["origin_airport_name"]
+    dest_airport = flight["dest_airport_name"]
+    orig_iata = flight["origin_iata"]
+    dest_iata = flight["dest_iata"]
+
+    # Fetch drive-to-airport and transit-from-airport in parallel
+    drive_to, transit_from = await asyncio.gather(
+        get_driving_route(origin, orig_airport, google_key),
+        get_transit_route(dest_airport, destination, departure_time, google_key),
+    )
+
+    if not drive_to:
+        return None
+
+    segments: List[RouteSegment] = [
+        RouteSegment(
+            mode=TransportMode.DRIVE,
+            from_location=origin,
+            to_location=orig_airport,
+            duration_minutes=drive_to["duration_minutes"],
+            distance_km=drive_to["distance_km"],
+            cost_usd=drive_to["cost_usd"],
+        ),
+        RouteSegment(
+            mode=TransportMode.FLIGHT,
+            from_location=orig_iata,
+            to_location=dest_iata,
+            duration_minutes=flight["duration_minutes"],
+            cost_usd=flight["cost_usd"],
+            carrier=flight["carrier"],
+            departure_time=flight["departure_time"],
+            arrival_time=flight["arrival_time"],
+        ),
+    ]
+
+    last_leg_minutes = 0
+    last_leg_cost = 0.0
+    last_leg_mode = "transit"
+
+    if transit_from and transit_from["duration_minutes"] > 0:
+        segments.append(
+            RouteSegment(
+                mode=TransportMode.TRANSIT,
+                from_location=dest_airport,
+                to_location=destination,
+                duration_minutes=transit_from["duration_minutes"],
+                cost_usd=transit_from["cost_usd"],
+            )
+        )
+        last_leg_minutes = transit_from["duration_minutes"]
+        last_leg_cost = transit_from["cost_usd"]
+    else:
+        # Fall back to rideshare estimate using driving distance
+        drive_from = await get_driving_route(dest_airport, destination, google_key)
+        if drive_from:
+            km = drive_from.get("distance_km", 20.0)
+            rs_cost = round(km * _RIDESHARE_COST_PER_KM, 2)
+            rs_minutes = round(km / _RIDESHARE_SPEED_KMH * 60)
+            segments.append(
+                RouteSegment(
+                    mode=TransportMode.RIDESHARE,
+                    from_location=dest_airport,
+                    to_location=destination,
+                    duration_minutes=rs_minutes,
+                    cost_usd=rs_cost,
+                    distance_km=km,
+                    notes="Rideshare estimate",
+                )
+            )
+            last_leg_minutes = rs_minutes
+            last_leg_cost = rs_cost
+            last_leg_mode = "rideshare"
+
+    total_minutes = (
+        drive_to["duration_minutes"]
+        + _AIRPORT_OVERHEAD_MINUTES
+        + flight["duration_minutes"]
+        + last_leg_minutes
+    )
+    total_cost = round(drive_to["cost_usd"] + flight["cost_usd"] + last_leg_cost, 2)
+
+    return ComposedRoute(
+        route_type=f"drive_fly_{last_leg_mode}",
+        label=f"Drive to {orig_iata} + Fly {orig_iata}→{dest_iata} + {last_leg_mode.capitalize()}",
+        segments=segments,
+        total_duration_minutes=total_minutes,
+        total_cost_usd=total_cost,
+        transfers=2,
+    )
+
+
 async def _build_fly_routes(
     origin: str,
     destination: str,
     departure_time: str,
-    origin_coords: Tuple[float, float],
-    dest_coords: Tuple[float, float],
     google_key: str,
-    amadeus_key: str,
-    amadeus_secret: str,
+    serpapi_key: str,
 ) -> List[ComposedRoute]:
-    token = await get_access_token(amadeus_key, amadeus_secret)
-    if not token:
-        logger.warning("Skipping fly routes: Amadeus auth failed")
-        return []
-
-    origin_airports, dest_airports = await asyncio.gather(
-        find_airports_near(origin_coords[0], origin_coords[1], token),
-        find_airports_near(dest_coords[0], dest_coords[1], token),
-    )
-
-    if not origin_airports or not dest_airports:
-        logger.info("No airports found near origin or destination")
-        return []
-
     departure_date = departure_time[:10]  # YYYY-MM-DD
-    routes: List[ComposedRoute] = []
 
-    # Try up to 2×2 airport pairs to limit API calls
-    for orig_ap in origin_airports[:2]:
-        for dest_ap in dest_airports[:2]:
-            orig_iata = orig_ap["iataCode"]
-            dest_iata = dest_ap["iataCode"]
-            if orig_iata == dest_iata:
-                continue
+    flights = await search_flights(origin, destination, departure_date, serpapi_key)
+    if not flights:
+        logger.info("No flights found for %s → %s on %s", origin, destination, departure_date)
+        return []
 
-            orig_ap_address = f"{orig_ap['name']}, {orig_ap['address']['cityName']}"
-            dest_ap_address = f"{dest_ap['name']}, {dest_ap['address']['cityName']}"
+    # Build all fly-route variants concurrently
+    tasks = [
+        _build_one_fly_route(origin, destination, departure_time, flight, google_key)
+        for flight in flights
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Fetch drive-to-airport, flights, and transit-from-airport in parallel
-            drive_to, flights, transit_from = await asyncio.gather(
-                get_driving_route(origin, orig_ap_address, google_key),
-                search_flights(orig_iata, dest_iata, departure_date, token),
-                get_transit_route(dest_ap_address, destination, departure_time, google_key),
-            )
-
-            if not drive_to or not flights:
-                continue
-
-            # Use the cheapest flight for this airport pair
-            flight = min(flights, key=lambda f: f["cost_usd"])
-
-            segments: List[RouteSegment] = [
-                RouteSegment(
-                    mode=TransportMode.DRIVE,
-                    from_location=origin,
-                    to_location=orig_ap_address,
-                    duration_minutes=drive_to["duration_minutes"],
-                    distance_km=drive_to["distance_km"],
-                    cost_usd=drive_to["cost_usd"],
-                ),
-                RouteSegment(
-                    mode=TransportMode.FLIGHT,
-                    from_location=orig_iata,
-                    to_location=dest_iata,
-                    duration_minutes=flight["duration_minutes"],
-                    cost_usd=flight["cost_usd"],
-                    carrier=flight["carrier"],
-                    departure_time=flight["departure_time"],
-                    arrival_time=flight["arrival_time"],
-                ),
-            ]
-
-            last_leg_minutes = 0
-            last_leg_cost = 0.0
-            last_leg_mode = "transit"
-
-            if transit_from and transit_from["duration_minutes"] > 0:
-                segments.append(
-                    RouteSegment(
-                        mode=TransportMode.TRANSIT,
-                        from_location=dest_ap_address,
-                        to_location=destination,
-                        duration_minutes=transit_from["duration_minutes"],
-                        cost_usd=transit_from["cost_usd"],
-                    )
-                )
-                last_leg_minutes = transit_from["duration_minutes"]
-                last_leg_cost = transit_from["cost_usd"]
-            else:
-                # Fall back to rideshare estimate using driving distance
-                drive_from = await get_driving_route(dest_ap_address, destination, google_key)
-                if drive_from:
-                    km = drive_from.get("distance_km", 20.0)
-                    rs_cost = round(km * _RIDESHARE_COST_PER_KM, 2)
-                    rs_minutes = round(km / _RIDESHARE_SPEED_KMH * 60)
-                    segments.append(
-                        RouteSegment(
-                            mode=TransportMode.RIDESHARE,
-                            from_location=dest_ap_address,
-                            to_location=destination,
-                            duration_minutes=rs_minutes,
-                            cost_usd=rs_cost,
-                            distance_km=km,
-                            notes="Rideshare estimate",
-                        )
-                    )
-                    last_leg_minutes = rs_minutes
-                    last_leg_cost = rs_cost
-                    last_leg_mode = "rideshare"
-
-            total_minutes = (
-                drive_to["duration_minutes"]
-                + _AIRPORT_OVERHEAD_MINUTES
-                + flight["duration_minutes"]
-                + last_leg_minutes
-            )
-            total_cost = round(drive_to["cost_usd"] + flight["cost_usd"] + last_leg_cost, 2)
-
-            routes.append(
-                ComposedRoute(
-                    route_type=f"drive_fly_{last_leg_mode}",
-                    label=f"Drive to {orig_iata} + Fly to {dest_iata} + {last_leg_mode.capitalize()}",
-                    segments=segments,
-                    total_duration_minutes=total_minutes,
-                    total_cost_usd=total_cost,
-                    transfers=2,
-                )
-            )
+    routes = []
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error("Fly route builder raised: %s", result)
+        elif result is not None:
+            routes.append(result)
 
     return routes
 
@@ -234,7 +232,6 @@ def _score_and_tag(routes: List[ComposedRoute], preference: str) -> List[Compose
     cheapest.tags.append("cheapest")
     if fastest is not cheapest:
         fastest.tags.append("fastest")
-    # Best value = top-ranked route that isn't already tagged
     for route in routes:
         if not route.tags:
             route.tags.append("best_value")
@@ -246,15 +243,8 @@ def _score_and_tag(routes: List[ComposedRoute], preference: str) -> List[Compose
 async def compose_routes(
     request: SearchRequest,
     google_key: str,
-    amadeus_key: str,
-    amadeus_secret: str,
+    serpapi_key: str,
 ) -> List[ComposedRoute]:
-    # Geocode both ends in parallel (needed for airport proximity search)
-    origin_coords, dest_coords = await asyncio.gather(
-        geocode_address(request.origin, google_key),
-        geocode_address(request.destination, google_key),
-    )
-
     tasks = [
         _build_drive_only(request.origin, request.destination, google_key),
         _build_transit_only(
@@ -262,17 +252,14 @@ async def compose_routes(
         ),
     ]
 
-    if origin_coords and dest_coords and amadeus_key and amadeus_secret:
+    if serpapi_key:
         tasks.append(
             _build_fly_routes(
                 request.origin,
                 request.destination,
                 request.departure_time,
-                origin_coords,
-                dest_coords,
                 google_key,
-                amadeus_key,
-                amadeus_secret,
+                serpapi_key,
             )
         )
 

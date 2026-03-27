@@ -15,8 +15,7 @@ async def compose(request: SearchRequest) -> SearchResponse:
     routes = await compose_routes(
         request,
         google_key=settings.google_routes_api_key,
-        amadeus_key=settings.amadeus_api_key,
-        amadeus_secret=settings.amadeus_api_secret,
+        serpapi_key=settings.serpapi_key,
     )
 
     if not routes:
