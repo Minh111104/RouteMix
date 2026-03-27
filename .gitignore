@@ -32,3 +32,6 @@ Thumbs.db
 *.egg-info/
 .pytest_cache/
 dist/
+
+# Next.js
+next-env.d.ts
