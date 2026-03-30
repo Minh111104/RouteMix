@@ -14,8 +14,6 @@ Most apps show you one mode at a time. RouteMix builds **hybrid itineraries** au
 
 Each route is scored with a weighted formula across cost, time, and transfers — and you can re-sort results client-side without a new search.
 
----
-
 ## Tech stack
 
 | Layer | Technology |
@@ -27,8 +25,6 @@ Each route is scored with a weighted formula across cost, time, and transfers �
 | Flights | Serpapi — Google Flights engine |
 | Airport lookup | `airportsdata` (local, no API call) |
 | Map | Leaflet + OpenStreetMap (no key needed) |
-
----
 
 ## Project structure
 
@@ -61,8 +57,6 @@ RouteMix/
     │   └── api.ts
     └── .env.local.example
 ```
-
----
 
 ## Setup
 
@@ -130,8 +124,6 @@ npm run dev
 # Runs on http://localhost:3000
 ```
 
----
-
 ## API keys
 
 ### Google Cloud
@@ -150,8 +142,6 @@ The `$200/month` free credit covers heavy development usage.
 3. Free tier: **100 searches/month** — enough for development and demos
 
 > The app works with just the Google key. If `SERPAPI_KEY` is empty, flight routes are silently skipped and only driving + transit are returned.
-
----
 
 ## How it works
 
@@ -199,7 +189,6 @@ Routes are drawn as color-coded polylines on an OpenStreetMap base layer:
 
 Hover a route card to highlight it on the map. Click a polyline to select the corresponding card.
 
----
 
 ## Development notes
 
@@ -207,8 +196,6 @@ Hover a route card to highlight it on the map. Click a polyline to select the co
 - Next.js proxies `/api/*` to `localhost:8000` via `next.config.ts` rewrites
 - Serpapi uses sandbox/live data depending on your account tier
 - Transit fare data from Google is often unavailable for long-distance routes — the app shows "Fare unavailable" in that case
-
----
 
 ## License
 
