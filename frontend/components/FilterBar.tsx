@@ -1,5 +1,6 @@
 'use client';
 
+import { LayoutGrid, DollarSign, Zap, ArrowLeftRight } from 'lucide-react';
 import { SortFilter } from '@/lib/types';
 
 interface Props {
@@ -8,32 +9,38 @@ interface Props {
   count: number;
 }
 
-const OPTIONS: { value: SortFilter; label: string }[] = [
-  { value: 'all', label: 'All routes' },
-  { value: 'cheap', label: 'Cheapest first' },
-  { value: 'fast', label: 'Fastest first' },
-  { value: 'transfers', label: 'Fewest transfers' },
+const OPTIONS: { value: SortFilter; label: string; Icon: React.ElementType }[] = [
+  { value: 'all',       label: 'All',       Icon: LayoutGrid      },
+  { value: 'cheap',     label: 'Cheapest',  Icon: DollarSign      },
+  { value: 'fast',      label: 'Fastest',   Icon: Zap             },
+  { value: 'transfers', label: 'Transfers', Icon: ArrowLeftRight   },
 ];
 
 export default function FilterBar({ value, onChange, count }: Props) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-xs text-gray-400 font-medium uppercase tracking-wide mr-1">
+      <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
         {count} route{count !== 1 ? 's' : ''}
       </span>
-      {OPTIONS.map(opt => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-            value === opt.value
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
+      <div className="flex gap-1.5 flex-wrap">
+        {OPTIONS.map(({ value: v, label, Icon }) => {
+          const active = value === v;
+          return (
+            <button
+              key={v}
+              onClick={() => onChange(v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                active
+                  ? 'bg-sky-600 text-white border-sky-600 shadow-sm shadow-sky-200'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-sky-300 hover:text-sky-600'
+              }`}
+            >
+              <Icon className="w-3 h-3" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
