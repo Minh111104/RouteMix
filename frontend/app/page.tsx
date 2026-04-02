@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import SearchForm from '@/components/SearchForm';
 import RouteCard from '@/components/RouteCard';
 import FilterBar from '@/components/FilterBar';
+import ThemeToggle from '@/components/ThemeToggle';
 import { searchRoutes } from '@/lib/api';
 import { ComposedRoute, SearchRequest, SortFilter } from '@/lib/types';
 
@@ -62,10 +63,9 @@ export default function Home() {
   const fastest = routes.length ? Math.min(...routes.map(r => r.total_duration_minutes)) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Hero header */}
       <div className="bg-gradient-to-br from-sky-600 via-sky-700 to-indigo-800 relative overflow-hidden">
-        {/* Dot grid overlay */}
         <div
           className="absolute inset-0 opacity-10"
           style={{
@@ -74,16 +74,21 @@ export default function Home() {
           }}
         />
         <div className="relative max-w-7xl mx-auto px-4 pt-10 pb-16">
-          <div className="mb-2 inline-flex items-center gap-2 text-sky-200 text-sm font-medium tracking-wide uppercase">
-            <span className="w-4 h-px bg-sky-400 inline-block" />
-            Multimodal Travel Planner
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 text-sky-200 text-sm font-medium tracking-wide uppercase">
+                <span className="w-4 h-px bg-sky-400 inline-block" />
+                Multimodal Travel Planner
+              </div>
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-2">
+                Route<span className="text-sky-300">Mix</span>
+              </h1>
+              <p className="text-sky-100 text-lg max-w-xl">
+                Compare every way to get there — drive, fly, transit, or mix them all.
+              </p>
+            </div>
+            <ThemeToggle />
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-2">
-            Route<span className="text-sky-300">Mix</span>
-          </h1>
-          <p className="text-sky-100 text-lg max-w-xl">
-            Compare every way to get there — drive, fly, transit, or mix them all. Ranked by what matters to you.
-          </p>
         </div>
       </div>
 
@@ -98,8 +103,8 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 pb-16">
         {/* Error */}
         {error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3">
-            <span className="text-red-400 mt-0.5">⚠</span>
+          <div className="mt-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl text-red-700 dark:text-red-400 text-sm flex items-start gap-3">
+            <span className="mt-0.5">⚠</span>
             <span>{error}</span>
           </div>
         )}
@@ -109,16 +114,16 @@ export default function Home() {
           <div className="mt-8 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
             <div className="lg:col-span-2 space-y-4">
               {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
-                  <div className="h-16 bg-gray-100" />
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-pulse">
+                  <div className="h-16 bg-gray-100 dark:bg-gray-700" />
                   <div className="p-4 space-y-2">
-                    <div className="h-3 bg-gray-100 rounded w-3/4" />
-                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-1/2" />
                   </div>
                 </div>
               ))}
             </div>
-            <div className="lg:col-span-3 h-[520px] bg-gray-100 rounded-2xl animate-pulse" />
+            <div className="lg:col-span-3 h-[520px] bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
           </div>
         )}
 
@@ -128,8 +133,8 @@ export default function Home() {
             {routes.length === 0 && !error ? (
               <div className="mt-12 text-center py-16">
                 <p className="text-4xl mb-3">🗺️</p>
-                <p className="text-gray-500 font-medium">No routes found</p>
-                <p className="text-gray-400 text-sm mt-1">Try different locations or a later departure date.</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium">No routes found</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Try different locations or a later departure date.</p>
               </div>
             ) : (
               <>
@@ -137,23 +142,23 @@ export default function Home() {
                 <div className="mt-8 mb-4 flex flex-wrap gap-4 items-center justify-between">
                   <div className="flex items-center gap-6">
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Routes found</p>
-                      <p className="text-2xl font-bold text-gray-900">{routes.length}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Routes found</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{routes.length}</p>
                     </div>
                     {cheapest !== null && (
                       <>
-                        <div className="w-px h-8 bg-gray-200" />
+                        <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
                         <div>
-                          <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Cheapest</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Cheapest</p>
                           <p className="text-2xl font-bold text-green-600">{formatCost(cheapest)}</p>
                         </div>
                       </>
                     )}
                     {fastest !== null && (
                       <>
-                        <div className="w-px h-8 bg-gray-200" />
+                        <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
                         <div>
-                          <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Fastest</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Fastest</p>
                           <p className="text-2xl font-bold text-sky-600">{formatDuration(fastest)}</p>
                         </div>
                       </>
@@ -162,7 +167,6 @@ export default function Home() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-                  {/* Left: filter + cards */}
                   <div className="lg:col-span-2 space-y-3">
                     <FilterBar value={filter} onChange={setFilter} count={routes.length} />
                     {displayedRoutes.map((route, i) => (
@@ -176,8 +180,6 @@ export default function Home() {
                       />
                     ))}
                   </div>
-
-                  {/* Right: sticky map */}
                   <div className="lg:col-span-3 sticky top-6 h-[520px] lg:h-[calc(100vh-6rem)]">
                     <MapView
                       routes={routes}
@@ -195,10 +197,10 @@ export default function Home() {
 
         {/* Empty state before search */}
         {!loading && !searched && (
-          <div className="mt-16 text-center py-8 text-gray-400">
+          <div className="mt-16 text-center py-8">
             <p className="text-5xl mb-4">✈️</p>
-            <p className="font-medium text-gray-500">Enter your origin and destination above to compare routes</p>
-            <p className="text-sm mt-1">Driving · Transit · Flights · Hybrid combinations</p>
+            <p className="font-medium text-gray-500 dark:text-gray-400">Enter your origin and destination above to compare routes</p>
+            <p className="text-sm mt-1 text-gray-400 dark:text-gray-500">Driving · Transit · Flights · Hybrid combinations</p>
           </div>
         )}
       </div>
