@@ -2,7 +2,7 @@
 
 A multimodal travel planner that compares every realistic way to get from A to B — driving, public transit, flying, and hybrid combinations like drive-to-airport + fly + rideshare. Routes are scored and ranked so you can instantly find the cheapest, fastest, or best-value option.
 
-![RouteMix screenshot](https://i.imgur.com/placeholder.png)
+![RouteMix screenshot](frontend/.next/static/media/routemix_homescreen.jpg)
 
 ## What makes it different
 
@@ -188,7 +188,6 @@ Routes are drawn as color-coded polylines on an OpenStreetMap base layer:
 | Rideshare | Orange |
 
 Hover a route card to highlight it on the map. Click a polyline to select the corresponding card.
-
 
 ## Development notes
 
