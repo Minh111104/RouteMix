@@ -198,4 +198,4 @@ Hover a route card to highlight it on the map. Click a polyline to select the co
 
 ## License
 
-MIT
+This project is made for educational purpose.
