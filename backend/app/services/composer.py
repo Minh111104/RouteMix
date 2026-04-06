@@ -46,6 +46,7 @@ async def _build_drive_only(
                 notes=f"{data['distance_km']} km · gas estimate",
                 from_coords=_coords(origin_coords),
                 to_coords=_coords(dest_coords),
+                polyline=data.get("polyline"),
             )
         ],
         total_duration_minutes=data["duration_minutes"],
@@ -123,6 +124,7 @@ async def _build_one_fly_route(
             cost_usd=drive_to["cost_usd"],
             from_coords=_coords(origin_coords),
             to_coords=orig_ap_c,
+            polyline=drive_to.get("polyline"),
         ),
         RouteSegment(
             mode=TransportMode.FLIGHT,

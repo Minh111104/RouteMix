@@ -36,6 +36,7 @@ class RouteSegment(BaseModel):
     notes: Optional[str] = None
     from_coords: Optional[Coords] = None
     to_coords: Optional[Coords] = None
+    polyline: Optional[str] = None
 
 
 class ComposedRoute(BaseModel):

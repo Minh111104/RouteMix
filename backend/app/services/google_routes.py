@@ -54,7 +54,7 @@ async def get_driving_route(
     }
     headers = {
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters",
+        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
         "Content-Type": "application/json",
     }
 
@@ -77,6 +77,7 @@ async def get_driving_route(
         "duration_minutes": round(duration_s / 60),
         "distance_km": round(distance_m / 1000, 1),
         "cost_usd": round(distance_m * _GAS_COST_PER_METER, 2),
+        "polyline": route.get("polyline", {}).get("encodedPolyline"),
     }
 
 

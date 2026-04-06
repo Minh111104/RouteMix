@@ -20,6 +20,7 @@ export interface RouteSegment {
   notes?: string;
   from_coords?: Coords;
   to_coords?: Coords;
+  polyline?: string;
 }
 
 export interface ComposedRoute {
