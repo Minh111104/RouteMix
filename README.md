@@ -1,4 +1,4 @@
-# RouteMix
+# RouteMix 🚗✈️
 
 A multimodal travel planner that compares every realistic way to get from A to B — driving, public transit, flying, and hybrid combinations like drive-to-airport + fly + rideshare. Routes are scored and ranked so you can instantly find the cheapest, fastest, or best-value option.
 
