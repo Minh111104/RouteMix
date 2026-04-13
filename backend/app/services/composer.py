@@ -175,6 +175,7 @@ async def _build_one_fly_route(
                     notes="Rideshare estimate",
                     from_coords=dest_ap_c,
                     to_coords=_coords(dest_coords),
+                    polyline=drive_from.get("polyline"),
                 )
             )
             last_leg_minutes = rs_minutes
