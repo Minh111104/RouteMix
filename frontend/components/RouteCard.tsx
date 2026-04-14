@@ -1,4 +1,4 @@
-import { Car, Bus, Plane, Navigation, PersonStanding } from 'lucide-react';
+import { Car, Bus, Plane, Navigation, PersonStanding, Train } from 'lucide-react';
 import { ComposedRoute, RouteSegment, TransportMode } from '@/lib/types';
 
 function formatDuration(minutes: number): string {
@@ -23,6 +23,8 @@ const MODE_CONFIG: Record<
   flight:    { Icon: Plane,          label: 'Flight',    pill: 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-100 dark:border-purple-800', dot: 'bg-purple-500' },
   walk:      { Icon: PersonStanding, label: 'Walk',      pill: 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600',          dot: 'bg-gray-400'   },
   rideshare: { Icon: Navigation,     label: 'Rideshare', pill: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-100 dark:border-orange-800', dot: 'bg-orange-500' },
+  train:     { Icon: Train,          label: 'Train',     pill: 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-100 dark:border-teal-800',         dot: 'bg-teal-600'   },
+  bus:       { Icon: Bus,            label: 'Bus',       pill: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-100 dark:border-amber-800',   dot: 'bg-amber-500'  },
 };
 
 const TAG_CONFIG: Record<string, { label: string; className: string }> = {

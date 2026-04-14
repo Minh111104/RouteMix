@@ -45,6 +45,8 @@ const MODE_COLORS: Record<TransportMode, string> = {
   flight:    '#a855f7', // purple
   rideshare: '#f97316', // orange
   walk:      '#6b7280', // gray
+  train:     '#0d9488', // teal
+  bus:       '#d97706', // amber
 };
 
 function AutoFit({ points }: { points: [number, number][] }) {

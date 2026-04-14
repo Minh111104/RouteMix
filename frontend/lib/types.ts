@@ -1,4 +1,4 @@
-export type TransportMode = 'drive' | 'transit' | 'flight' | 'walk' | 'rideshare';
+export type TransportMode = 'drive' | 'transit' | 'flight' | 'walk' | 'rideshare' | 'train' | 'bus';
 export type Preference = 'cheap' | 'fast' | 'balanced';
 export type SortFilter = 'all' | 'cheap' | 'fast' | 'transfers';
 
