@@ -23,13 +23,12 @@ def _ap_coords(ap: dict) -> Coords:
 
 
 async def _build_drive_only(
+    data: Optional[dict],
     origin: str,
     destination: str,
     origin_coords: Optional[Tuple[float, float]],
     dest_coords: Optional[Tuple[float, float]],
-    google_key: str,
 ) -> Optional[ComposedRoute]:
-    data = await get_driving_route(origin, destination, google_key)
     if not data:
         return None
     return ComposedRoute(
@@ -51,6 +50,84 @@ async def _build_drive_only(
         ],
         total_duration_minutes=data["duration_minutes"],
         total_cost_usd=data["cost_usd"],
+        transfers=0,
+    )
+
+
+async def _build_train_only(
+    data: Optional[dict],
+    origin: str,
+    destination: str,
+    origin_coords: Optional[Tuple[float, float]],
+    dest_coords: Optional[Tuple[float, float]],
+) -> Optional[ComposedRoute]:
+    """Estimate intercity train based on driving distance. Min 150 km."""
+    if not data:
+        return None
+    km = data["distance_km"]
+    if km < 150:
+        return None
+    # Intercity trains avg ~80 km/h, ~$0.13/km (Amtrak-style pricing)
+    duration = round(km / 80 * 60)
+    cost = round(km * 0.13, 2)
+    return ComposedRoute(
+        route_type="train_only",
+        label="Train",
+        segments=[
+            RouteSegment(
+                mode=TransportMode.TRAIN,
+                from_location=origin,
+                to_location=destination,
+                duration_minutes=duration,
+                distance_km=km,
+                cost_usd=cost,
+                notes="Intercity train estimate",
+                from_coords=_coords(origin_coords),
+                to_coords=_coords(dest_coords),
+                polyline=data.get("polyline"),
+            )
+        ],
+        total_duration_minutes=duration,
+        total_cost_usd=cost,
+        transfers=0,
+    )
+
+
+async def _build_bus_only(
+    data: Optional[dict],
+    origin: str,
+    destination: str,
+    origin_coords: Optional[Tuple[float, float]],
+    dest_coords: Optional[Tuple[float, float]],
+) -> Optional[ComposedRoute]:
+    """Estimate intercity bus based on driving distance. Min 100 km."""
+    if not data:
+        return None
+    km = data["distance_km"]
+    if km < 100:
+        return None
+    # Intercity buses avg ~70 km/h, ~$0.07/km (Greyhound/FlixBus-style)
+    duration = round(km / 70 * 60)
+    cost = round(km * 0.07, 2)
+    return ComposedRoute(
+        route_type="bus_only",
+        label="Intercity bus",
+        segments=[
+            RouteSegment(
+                mode=TransportMode.BUS,
+                from_location=origin,
+                to_location=destination,
+                duration_minutes=duration,
+                distance_km=km,
+                cost_usd=cost,
+                notes="Estimate · e.g. Greyhound / FlixBus",
+                from_coords=_coords(origin_coords),
+                to_coords=_coords(dest_coords),
+                polyline=data.get("polyline"),
+            )
+        ],
+        total_duration_minutes=duration,
+        total_cost_usd=cost,
         transfers=0,
     )
 
@@ -79,6 +156,7 @@ async def _build_transit_only(
                 notes=None if data["cost_usd"] > 0 else "Fare unavailable for this route",
                 from_coords=_coords(origin_coords),
                 to_coords=_coords(dest_coords),
+                polyline=data.get("polyline"),
             )
         ],
         total_duration_minutes=data["duration_minutes"],
@@ -312,19 +390,26 @@ async def compose_routes(
     google_key: str,
     serpapi_key: str,
 ) -> List[ComposedRoute]:
-    # Geocode origin and destination once — used for map coords and airport search
-    origin_coords, dest_coords = await asyncio.gather(
+    # Geocode + fetch driving route once — reused by drive/train/bus builders
+    origin_coords, dest_coords, driving_data = await asyncio.gather(
         geocode_address(request.origin, google_key),
         geocode_address(request.destination, google_key),
+        get_driving_route(request.origin, request.destination, google_key),
     )
 
     tasks = [
         _build_drive_only(
-            request.origin, request.destination, origin_coords, dest_coords, google_key
+            driving_data, request.origin, request.destination, origin_coords, dest_coords,
         ),
         _build_transit_only(
             request.origin, request.destination, request.departure_time,
             origin_coords, dest_coords, google_key,
+        ),
+        _build_train_only(
+            driving_data, request.origin, request.destination, origin_coords, dest_coords,
+        ),
+        _build_bus_only(
+            driving_data, request.origin, request.destination, origin_coords, dest_coords,
         ),
     ]
 
