@@ -108,7 +108,7 @@ async def get_transit_route(
     }
     headers = {
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "routes.duration,routes.legs.travelAdvisory.transitFare",
+        "X-Goog-FieldMask": "routes.duration,routes.polyline.encodedPolyline,routes.legs.travelAdvisory.transitFare",
         "Content-Type": "application/json",
     }
 
@@ -137,4 +137,5 @@ async def get_transit_route(
     return {
         "duration_minutes": round(duration_s / 60),
         "cost_usd": round(cost_usd, 2),
+        "polyline": route.get("polyline", {}).get("encodedPolyline"),
     }
