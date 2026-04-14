@@ -10,6 +10,8 @@ class TransportMode(str, Enum):
     FLIGHT = "flight"
     WALK = "walk"
     RIDESHARE = "rideshare"
+    TRAIN = "train"
+    BUS = "bus"
 
 
 class Preference(str, Enum):
