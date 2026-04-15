@@ -43,5 +43,6 @@ export interface SearchRequest {
 
 export interface SearchResponse {
   routes: ComposedRoute[];
+  recommendation?: string;
   search_id: string;
 }

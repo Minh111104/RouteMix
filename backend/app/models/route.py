@@ -61,4 +61,5 @@ class SearchRequest(BaseModel):
 
 class SearchResponse(BaseModel):
     routes: List[ComposedRoute]
+    recommendation: Optional[str] = None
     search_id: str = Field(default_factory=lambda: str(uuid.uuid4()))

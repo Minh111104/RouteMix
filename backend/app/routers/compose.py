@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app.config import settings
 from app.models.route import SearchRequest, SearchResponse
 from app.services.composer import compose_routes
+from app.services.recommend import generate_recommendation
 
 router = APIRouter(prefix="/api", tags=["routes"])
 
@@ -24,4 +25,11 @@ async def compose(request: SearchRequest) -> SearchResponse:
             detail="No routes found between the given locations. Check that the addresses are valid.",
         )
 
-    return SearchResponse(routes=routes)
+    recommendation = await generate_recommendation(
+        routes,
+        origin=request.origin,
+        destination=request.destination,
+        api_key=settings.anthropic_api_key,
+    )
+
+    return SearchResponse(routes=routes, recommendation=recommendation or None)

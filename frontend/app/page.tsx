@@ -34,6 +34,7 @@ function formatDuration(minutes: number) {
 
 export default function Home() {
   const [routes, setRoutes] = useState<ComposedRoute[]>([]);
+  const [recommendation, setRecommendation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
@@ -44,11 +45,13 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setRoutes([]);
+    setRecommendation(null);
     setFilter('all');
     setActiveRouteType(null);
     try {
       const data = await searchRoutes(req);
       setRoutes(data.routes);
+      setRecommendation(data.recommendation ?? null);
       setSearched(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -138,8 +141,16 @@ export default function Home() {
               </div>
             ) : (
               <>
+                {/* AI recommendation */}
+                {recommendation && (
+                  <div className="mt-8 flex gap-3 p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-sky-50 dark:from-indigo-950/40 dark:to-sky-950/40 border border-indigo-100 dark:border-indigo-900">
+                    <span className="text-lg shrink-0">✦</span>
+                    <p className="text-sm text-indigo-900 dark:text-indigo-200 leading-relaxed">{recommendation}</p>
+                  </div>
+                )}
+
                 {/* Stats bar */}
-                <div className="mt-8 mb-4 flex flex-wrap gap-4 items-center justify-between">
+                <div className={`${recommendation ? 'mt-4' : 'mt-8'} mb-4 flex flex-wrap gap-4 items-center justify-between`}>
                   <div className="flex items-center gap-6">
                     <div>
                       <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Routes found</p>
