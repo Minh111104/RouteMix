@@ -4,6 +4,8 @@ from typing import List, Optional, Tuple
 
 from app.models.route import ComposedRoute, Coords, RouteSegment, SearchRequest, TransportMode
 from app.services.airports import find_nearest_airports
+from app.services.amtrak import estimate_train
+from app.services.flixbus import search_buses
 from app.services.google_routes import geocode_address, get_driving_route, get_transit_route
 from app.services.serpapi import search_flights
 
@@ -61,34 +63,31 @@ async def _build_train_only(
     origin_coords: Optional[Tuple[float, float]],
     dest_coords: Optional[Tuple[float, float]],
 ) -> Optional[ComposedRoute]:
-    """Estimate intercity train based on driving distance. Min 150 km."""
-    if not data:
+    """Amtrak estimate using haversine distance and corridor-aware pricing."""
+    if not origin_coords or not dest_coords:
         return None
-    km = data["distance_km"]
-    if km < 150:
+    result = estimate_train(origin_coords, dest_coords)
+    if not result:
         return None
-    # Intercity trains avg ~80 km/h, ~$0.13/km (Amtrak-style pricing)
-    duration = round(km / 80 * 60)
-    cost = round(km * 0.13, 2)
     return ComposedRoute(
         route_type="train_only",
-        label="Train",
+        label="Train (Amtrak)",
         segments=[
             RouteSegment(
                 mode=TransportMode.TRAIN,
                 from_location=origin,
                 to_location=destination,
-                duration_minutes=duration,
-                distance_km=km,
-                cost_usd=cost,
-                notes="Intercity train estimate",
+                duration_minutes=result["duration_minutes"],
+                distance_km=result["distance_km"],
+                cost_usd=result["cost_usd"],
+                notes=f"Amtrak estimate · {result['corridor']}",
                 from_coords=_coords(origin_coords),
                 to_coords=_coords(dest_coords),
-                polyline=data.get("polyline"),
+                polyline=data.get("polyline") if data else None,
             )
         ],
-        total_duration_minutes=duration,
-        total_cost_usd=cost,
+        total_duration_minutes=result["duration_minutes"],
+        total_cost_usd=result["cost_usd"],
         transfers=0,
     )
 
@@ -99,14 +98,45 @@ async def _build_bus_only(
     destination: str,
     origin_coords: Optional[Tuple[float, float]],
     dest_coords: Optional[Tuple[float, float]],
+    departure_time: str,
 ) -> Optional[ComposedRoute]:
-    """Estimate intercity bus based on driving distance. Min 100 km."""
+    """Try FlixBus live data; fall back to distance-based estimate."""
+    departure_date = departure_time[:10]
+    fb = await search_buses(origin, destination, departure_date)
+
+    if fb:
+        notes = f"FlixBus · departs {fb['departure_time'][:16] if fb.get('departure_time') else departure_date}"
+        return ComposedRoute(
+            route_type="bus_only",
+            label="Intercity bus (FlixBus)",
+            segments=[
+                RouteSegment(
+                    mode=TransportMode.BUS,
+                    from_location=origin,
+                    to_location=destination,
+                    duration_minutes=fb["duration_minutes"],
+                    distance_km=data["distance_km"] if data else None,
+                    cost_usd=fb["cost_usd"],
+                    carrier=fb["carrier"],
+                    departure_time=fb.get("departure_time"),
+                    arrival_time=fb.get("arrival_time"),
+                    notes=notes,
+                    from_coords=_coords(origin_coords),
+                    to_coords=_coords(dest_coords),
+                    polyline=data.get("polyline") if data else None,
+                )
+            ],
+            total_duration_minutes=fb["duration_minutes"],
+            total_cost_usd=fb["cost_usd"],
+            transfers=0,
+        )
+
+    # FlixBus unavailable — fall back to estimate
     if not data:
         return None
     km = data["distance_km"]
     if km < 100:
         return None
-    # Intercity buses avg ~70 km/h, ~$0.07/km (Greyhound/FlixBus-style)
     duration = round(km / 70 * 60)
     cost = round(km * 0.07, 2)
     return ComposedRoute(
@@ -410,6 +440,7 @@ async def compose_routes(
         ),
         _build_bus_only(
             driving_data, request.origin, request.destination, origin_coords, dest_coords,
+            request.departure_time,
         ),
     ]
 
