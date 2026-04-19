@@ -4,16 +4,24 @@ import { useState } from 'react';
 import { MapPin, Calendar, Clock, ArrowLeftRight, Search, Loader2 } from 'lucide-react';
 import { SearchRequest } from '@/lib/types';
 
+interface InitialValues {
+  origin: string;
+  destination: string;
+  date: string;
+  time: string;
+}
+
 interface Props {
   onSearch: (req: SearchRequest) => void;
   loading: boolean;
+  initialValues?: InitialValues;
 }
 
-export default function SearchForm({ onSearch, loading }: Props) {
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('09:00');
+export default function SearchForm({ onSearch, loading, initialValues }: Props) {
+  const [origin, setOrigin] = useState(initialValues?.origin ?? '');
+  const [destination, setDestination] = useState(initialValues?.destination ?? '');
+  const [date, setDate] = useState(initialValues?.date ?? '');
+  const [time, setTime] = useState(initialValues?.time ?? '09:00');
 
   const today = new Date().toISOString().split('T')[0];
 

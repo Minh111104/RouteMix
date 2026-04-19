@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { Link, Check } from 'lucide-react';
 import SearchForm from '@/components/SearchForm';
 import RouteCard from '@/components/RouteCard';
 import FilterBar from '@/components/FilterBar';
 import ThemeToggle from '@/components/ThemeToggle';
 import { searchRoutes } from '@/lib/api';
-import { ComposedRoute, SearchRequest, SortFilter } from '@/lib/types';
+import { ComposedRoute, Preference, SearchRequest, SortFilter } from '@/lib/types';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -32,7 +34,10 @@ function formatDuration(minutes: number) {
   return `${h}h ${m}m`;
 }
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [routes, setRoutes] = useState<ComposedRoute[]>([]);
   const [recommendation, setRecommendation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,8 +45,30 @@ export default function Home() {
   const [searched, setSearched] = useState(false);
   const [filter, setFilter] = useState<SortFilter>('all');
   const [activeRouteType, setActiveRouteType] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const autoSearched = useRef(false);
+
+  // Derive initial form values from URL params
+  const initialValues = useMemo(() => {
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    const date = searchParams.get('date');
+    const time = searchParams.get('time');
+    if (!from || !to || !date) return undefined;
+    return { origin: from, destination: to, date, time: time ?? '09:00' };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSearch(req: SearchRequest) {
+    // Sync params into URL without triggering navigation
+    const params = new URLSearchParams({
+      from: req.origin,
+      to: req.destination,
+      date: req.departure_time.slice(0, 10),
+      time: req.departure_time.slice(11, 16),
+      pref: req.preference,
+    });
+    router.replace(`?${params.toString()}`, { scroll: false });
+
     setLoading(true);
     setError(null);
     setRoutes([]);
@@ -58,6 +85,26 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Auto-fire search when URL params are present on first load
+  useEffect(() => {
+    if (autoSearched.current || !initialValues) return;
+    autoSearched.current = true;
+    const pref = (searchParams.get('pref') ?? 'balanced') as Preference;
+    handleSearch({
+      origin: initialValues.origin,
+      destination: initialValues.destination,
+      departure_time: `${initialValues.date}T${initialValues.time}:00`,
+      preference: pref,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleShare() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   const displayedRoutes = useMemo(() => sortRoutes(routes, filter), [routes, filter]);
@@ -98,7 +145,7 @@ export default function Home() {
       {/* Search card overlapping hero */}
       <div className="max-w-7xl mx-auto px-4">
         <div className="-mt-8 relative z-10">
-          <SearchForm onSearch={handleSearch} loading={loading} />
+          <SearchForm onSearch={handleSearch} loading={loading} initialValues={initialValues} />
         </div>
       </div>
 
@@ -175,6 +222,24 @@ export default function Home() {
                       </>
                     )}
                   </div>
+
+                  {/* Share button */}
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-sky-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-500" />
+                        <span className="text-green-600 dark:text-green-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Link className="w-4 h-4" />
+                        Share
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
@@ -216,5 +281,13 @@ export default function Home() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense>
+      <HomeContent />
+    </Suspense>
   );
 }
