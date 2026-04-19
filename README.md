@@ -37,16 +37,21 @@ RouteMix/
 │   │   ├── models/route.py          # Pydantic models
 │   │   ├── routers/compose.py       # POST /api/compose
 │   │   └── services/
+│   │       ├── composer.py          # route composition + scoring engine
 │   │       ├── google_routes.py     # driving, transit, geocoding + polylines
 │   │       ├── serpapi.py           # flight search via Serpapi
 │   │       ├── airports.py          # nearest commercial airport finder
-│   │       └── composer.py          # route composition + scoring engine
+│   │       ├── amtrak.py            # Amtrak corridor-aware train estimates
+│   │       ├── flixbus.py           # FlixBus live bus search
+│   │       ├── amadeus.py           # Amadeus flight API (alternative to Serpapi)
+│   │       └── recommend.py         # AI route recommendation
 │   ├── requirements.txt
 │   └── .env.example
 └── frontend/
     ├── app/
     │   ├── layout.tsx               # font, dark mode provider
-    │   └── page.tsx                 # hero, search, results layout
+    │   ├── page.tsx                 # hero, search, results layout
+    │   └── globals.css
     ├── components/
     │   ├── SearchForm.tsx           # origin / destination / date / time inputs
     │   ├── RouteCard.tsx            # timeline-style segment breakdown per route
@@ -55,8 +60,8 @@ RouteMix/
     │   ├── ThemeProvider.tsx        # applies saved dark/light preference on load
     │   └── ThemeToggle.tsx          # sun/moon button in the hero header
     ├── lib/
-    │   ├── types.ts
-    │   └── api.ts
+    │   ├── types.ts                 # shared TypeScript types (mirrors Pydantic models)
+    │   └── api.ts                   # fetch wrapper for backend /api/compose
     └── .env.local.example
 ```
 
