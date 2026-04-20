@@ -8,11 +8,11 @@ Most apps show you one mode at a time. RouteMix builds **all viable itineraries*
 
 - Drive to DTW → Fly DTW→LGA → Rideshare to destination
 - Drive only across the country
-- Intercity train (estimate based on distance)
-- Intercity bus (estimate · e.g. Greyhound / FlixBus)
+- Intercity train via Amtrak (corridor-aware pricing and speed)
+- Intercity bus via FlixBus (live fares when available, estimate fallback)
 - Public transit end-to-end (where Google has schedule data)
 
-Each route is scored with a weighted formula across cost, time, and transfers — and you can re-sort results client-side without a new search.
+Each route is scored with a weighted formula across cost, time, and transfers — and you can re-sort results client-side without a new search. Any search can be shared as a URL that re-runs the exact same query when opened.
 
 ## Tech stack
 
@@ -23,6 +23,8 @@ Each route is scored with a weighted formula across cost, time, and transfers �
 | Routing | Google Routes API (driving + transit polylines) |
 | Geocoding | Google Geocoding API |
 | Flights | Serpapi — Google Flights engine |
+| Bus | FlixBus unofficial API (live fares + fallback estimate) |
+| Train | Amtrak corridor-aware estimate (haversine distance, no API key) |
 | Airport lookup | `airportsdata` (local IATA database, no API call) |
 | Map | Leaflet + OpenStreetMap (no key needed) |
 
@@ -158,8 +160,8 @@ The `$200/month` free credit covers heavy development usage.
 
 1. **Drive only** — Google Routes API; cost estimated from distance × gas price; real road polyline on map
 2. **Transit only** — Google Routes API transit mode; real route polyline returned where Google has schedule data
-3. **Train** — distance-based estimate (~80 km/h avg, ~$0.13/km); shown for routes ≥ 150 km
-4. **Bus** — distance-based estimate (~70 km/h avg, ~$0.07/km); shown for routes ≥ 100 km
+3. **Train (Amtrak)** — haversine distance + corridor-aware speed and pricing (Northeast Regional, Pacific, Midwest, Long-distance); shown for routes ≥ 100 km
+4. **Bus (FlixBus)** — tries FlixBus live API for real fare and schedule; falls back to distance estimate if the route isn't served or the API is unreachable; shown for routes ≥ 100 km
 5. **Fly routes** — for each pair of nearby commercial airports:
    - Find nearest airports using local `airportsdata` database (no API call)
    - Filter out GA airports by name heuristic; positive override for "international / metro" airports
@@ -199,6 +201,10 @@ Routes are drawn as color-coded polylines on an OpenStreetMap base layer. Drive 
 | Rideshare | Orange | Road-following polyline |
 
 Hover a route card to highlight it on the map. Click a polyline to select the corresponding card.
+
+### Shareable URLs
+
+Every search writes its parameters (`from`, `to`, `date`, `time`, `pref`) into the URL as query strings via `router.replace`. Opening a shared URL pre-fills the form and auto-fires the search. A **Share** button in the results stats bar copies the current URL to the clipboard.
 
 ### Dark mode
 
