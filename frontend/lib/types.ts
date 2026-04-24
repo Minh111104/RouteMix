@@ -37,6 +37,7 @@ export interface ComposedRoute {
 export interface SearchRequest {
   origin: string;
   destination: string;
+  waypoints?: string[];
   departure_time: string;
   preference: Preference;
 }

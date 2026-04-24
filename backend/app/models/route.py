@@ -55,6 +55,7 @@ class ComposedRoute(BaseModel):
 class SearchRequest(BaseModel):
     origin: str
     destination: str
+    waypoints: List[str] = Field(default_factory=list)
     departure_time: str  # ISO 8601, e.g. "2024-01-15T09:00:00"
     preference: Preference = Preference.BALANCED
 
