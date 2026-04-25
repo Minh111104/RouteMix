@@ -55,7 +55,9 @@ function HomeContent() {
     const date = searchParams.get('date');
     const time = searchParams.get('time');
     if (!from || !to || !date) return undefined;
-    return { origin: from, destination: to, date, time: time ?? '09:00' };
+    const stopsParam = searchParams.get('stops');
+    const waypoints = stopsParam ? stopsParam.split('|').filter(Boolean) : [];
+    return { origin: from, destination: to, date, time: time ?? '09:00', waypoints };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSearch(req: SearchRequest) {
@@ -67,6 +69,8 @@ function HomeContent() {
       time: req.departure_time.slice(11, 16),
       pref: req.preference,
     });
+    const filteredWaypoints = (req.waypoints ?? []).filter(Boolean);
+    if (filteredWaypoints.length) params.set('stops', filteredWaypoints.join('|'));
     router.replace(`?${params.toString()}`, { scroll: false });
 
     setLoading(true);
@@ -95,6 +99,7 @@ function HomeContent() {
     handleSearch({
       origin: initialValues.origin,
       destination: initialValues.destination,
+      waypoints: initialValues.waypoints?.length ? initialValues.waypoints : undefined,
       departure_time: `${initialValues.date}T${initialValues.time}:00`,
       preference: pref,
     });
