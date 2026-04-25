@@ -88,9 +88,11 @@ export default function MapView({ routes, activeRouteType, onRouteClick }: Props
     })
   );
 
-  // Find origin (first from_coords) and destination (last to_coords) for markers
+  // Find origin, destination, and intermediate waypoint markers
   let originPoint: [number, number] | null = null;
   let destPoint: [number, number] | null = null;
+  const waypointPoints: { point: [number, number]; label: string }[] = [];
+
   for (const route of routes) {
     if (!originPoint && route.segments[0]?.from_coords) {
       const c = route.segments[0].from_coords;
@@ -100,6 +102,17 @@ export default function MapView({ routes, activeRouteType, onRouteClick }: Props
     if (!destPoint && last?.to_coords) {
       const c = last.to_coords;
       destPoint = [c.lat, c.lon];
+    }
+    // Collect intermediate stops from multi-leg drive routes
+    if (route.route_type === 'drive_only' && route.segments.length > 1 && waypointPoints.length === 0) {
+      route.segments.slice(0, -1).forEach((seg, i) => {
+        if (seg.to_coords) {
+          waypointPoints.push({
+            point: [seg.to_coords.lat, seg.to_coords.lon],
+            label: seg.to_location.split(',')[0],
+          });
+        }
+      });
     }
     if (originPoint && destPoint) break;
   }
@@ -167,6 +180,18 @@ export default function MapView({ routes, activeRouteType, onRouteClick }: Props
           <Tooltip permanent direction="top" offset={[0, -10]}>Origin</Tooltip>
         </CircleMarker>
       )}
+
+      {/* Intermediate waypoint markers */}
+      {waypointPoints.map(({ point, label }, i) => (
+        <CircleMarker
+          key={`waypoint-${i}`}
+          center={point}
+          radius={7}
+          pathOptions={{ color: '#7c3aed', fillColor: '#a78bfa', fillOpacity: 1, weight: 2 }}
+        >
+          <Tooltip permanent direction="top" offset={[0, -10]}>{label}</Tooltip>
+        </CircleMarker>
+      ))}
 
       {/* Destination marker */}
       {destPoint && (
