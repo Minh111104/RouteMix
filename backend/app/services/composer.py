@@ -378,6 +378,173 @@ async def _build_fly_routes(
     return routes
 
 
+async def _build_multistop_drive(
+    cities: List[str],
+    pairs: List[tuple],
+    drive_legs: List[Optional[dict]],
+    coords_map: dict,
+) -> Optional[ComposedRoute]:
+    if any(leg is None for leg in drive_legs):
+        return None
+    segments = [
+        RouteSegment(
+            mode=TransportMode.DRIVE,
+            from_location=a,
+            to_location=b,
+            duration_minutes=leg["duration_minutes"],
+            distance_km=leg["distance_km"],
+            cost_usd=leg["cost_usd"],
+            notes=f"{leg['distance_km']} km · gas estimate",
+            from_coords=_coords(coords_map.get(a)),
+            to_coords=_coords(coords_map.get(b)),
+            polyline=leg.get("polyline"),
+        )
+        for (a, b), leg in zip(pairs, drive_legs)
+    ]
+    n = len(pairs)
+    return ComposedRoute(
+        route_type="drive_only",
+        label=f"Drive · {n} leg{'s' if n > 1 else ''}",
+        segments=segments,
+        total_duration_minutes=sum(s.duration_minutes for s in segments),
+        total_cost_usd=round(sum(s.cost_usd for s in segments), 2),
+        transfers=0,
+    )
+
+
+async def _build_multistop_train(
+    cities: List[str],
+    pairs: List[tuple],
+    coords_map: dict,
+    drive_legs: List[Optional[dict]],
+) -> Optional[ComposedRoute]:
+    segments = []
+    for i, (a, b) in enumerate(pairs):
+        a_coords = coords_map.get(a)
+        b_coords = coords_map.get(b)
+        if not a_coords or not b_coords:
+            return None
+        result = estimate_train(a_coords, b_coords)
+        if not result:
+            return None
+        segments.append(RouteSegment(
+            mode=TransportMode.TRAIN,
+            from_location=a,
+            to_location=b,
+            duration_minutes=result["duration_minutes"],
+            distance_km=result["distance_km"],
+            cost_usd=result["cost_usd"],
+            notes=f"Amtrak estimate · {result['corridor']}",
+            from_coords=_coords(a_coords),
+            to_coords=_coords(b_coords),
+            polyline=drive_legs[i].get("polyline") if drive_legs[i] else None,
+        ))
+    n = len(pairs)
+    return ComposedRoute(
+        route_type="train_only",
+        label=f"Train · {n} leg{'s' if n > 1 else ''}",
+        segments=segments,
+        total_duration_minutes=sum(s.duration_minutes for s in segments),
+        total_cost_usd=round(sum(s.cost_usd for s in segments), 2),
+        transfers=len(pairs) - 1,
+    )
+
+
+async def _build_multistop_bus(
+    cities: List[str],
+    pairs: List[tuple],
+    coords_map: dict,
+    drive_legs: List[Optional[dict]],
+    departure_time: str,
+) -> Optional[ComposedRoute]:
+    departure_date = departure_time[:10]
+    fb_results = await asyncio.gather(
+        *[search_buses(a, b, departure_date) for a, b in pairs],
+        return_exceptions=True,
+    )
+    segments = []
+    for i, (a, b) in enumerate(pairs):
+        fb = fb_results[i] if not isinstance(fb_results[i], Exception) else None
+        dl = drive_legs[i]
+        if fb:
+            segments.append(RouteSegment(
+                mode=TransportMode.BUS,
+                from_location=a,
+                to_location=b,
+                duration_minutes=fb["duration_minutes"],
+                distance_km=dl["distance_km"] if dl else None,
+                cost_usd=fb["cost_usd"],
+                carrier=fb["carrier"],
+                departure_time=fb.get("departure_time"),
+                arrival_time=fb.get("arrival_time"),
+                notes="FlixBus · live fare",
+                from_coords=_coords(coords_map.get(a)),
+                to_coords=_coords(coords_map.get(b)),
+                polyline=dl.get("polyline") if dl else None,
+            ))
+        elif dl and dl["distance_km"] >= 100:
+            km = dl["distance_km"]
+            segments.append(RouteSegment(
+                mode=TransportMode.BUS,
+                from_location=a,
+                to_location=b,
+                duration_minutes=round(km / 70 * 60),
+                distance_km=km,
+                cost_usd=round(km * 0.07, 2),
+                notes="Estimate · e.g. Greyhound / FlixBus",
+                from_coords=_coords(coords_map.get(a)),
+                to_coords=_coords(coords_map.get(b)),
+                polyline=dl.get("polyline"),
+            ))
+        else:
+            return None
+    n = len(pairs)
+    return ComposedRoute(
+        route_type="bus_only",
+        label=f"Bus · {n} leg{'s' if n > 1 else ''}",
+        segments=segments,
+        total_duration_minutes=sum(s.duration_minutes for s in segments),
+        total_cost_usd=round(sum(s.cost_usd for s in segments), 2),
+        transfers=len(pairs) - 1,
+    )
+
+
+async def _compose_multistop(
+    cities: List[str],
+    request: "SearchRequest",
+    google_key: str,
+    serpapi_key: str,
+) -> List[ComposedRoute]:
+    pairs = list(zip(cities, cities[1:]))
+
+    geocode_results, drive_results = await asyncio.gather(
+        asyncio.gather(*[geocode_address(c, google_key) for c in cities], return_exceptions=True),
+        asyncio.gather(*[get_driving_route(a, b, google_key) for a, b in pairs], return_exceptions=True),
+    )
+
+    coords_map = {
+        city: (None if isinstance(r, Exception) else r)
+        for city, r in zip(cities, geocode_results)
+    }
+    drive_legs = [None if isinstance(r, Exception) else r for r in drive_results]
+
+    results = await asyncio.gather(
+        _build_multistop_drive(cities, pairs, drive_legs, coords_map),
+        _build_multistop_train(cities, pairs, coords_map, drive_legs),
+        _build_multistop_bus(cities, pairs, coords_map, drive_legs, request.departure_time),
+        return_exceptions=True,
+    )
+
+    routes: List[ComposedRoute] = []
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error("Multi-stop builder raised: %s", result)
+        elif result is not None:
+            routes.append(result)
+
+    return _score_and_tag(routes, request.preference)
+
+
 def _score_and_tag(routes: List[ComposedRoute], preference: str) -> List[ComposedRoute]:
     if not routes:
         return routes
@@ -420,6 +587,11 @@ async def compose_routes(
     google_key: str,
     serpapi_key: str,
 ) -> List[ComposedRoute]:
+    waypoints = [w.strip() for w in (request.waypoints or []) if w.strip()]
+    if waypoints:
+        cities = [request.origin, *waypoints, request.destination]
+        return await _compose_multistop(cities, request, google_key, serpapi_key)
+
     # Geocode + fetch driving route once — reused by drive/train/bus builders
     origin_coords, dest_coords, driving_data = await asyncio.gather(
         geocode_address(request.origin, google_key),
