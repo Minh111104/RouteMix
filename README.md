@@ -187,6 +187,10 @@ Weights by priority preset:
 | Save time | 0.1 | 0.8 | 0.1 |
 | Balanced | 0.4 | 0.4 | 0.2 |
 
+### Multi-stop
+
+Users are able to add/remove various stops in their journeys to find optimal routes.
+
 ### Map visualization
 
 Routes are drawn as color-coded polylines on an OpenStreetMap base layer. Drive and transit segments use the real encoded polyline from Google Routes API; flight segments use a dashed straight line; train and bus use a straight line to indicate they are estimates.
