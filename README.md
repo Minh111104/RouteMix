@@ -225,3 +225,5 @@ The UI supports light and dark mode. The preference is saved in `localStorage` a
 ## License
 
 This project is made for educational purposes.
+
+
