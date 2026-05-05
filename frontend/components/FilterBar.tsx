@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutGrid, DollarSign, Zap, ArrowLeftRight } from 'lucide-react';
+import { LayoutGrid, DollarSign, Zap, ArrowLeftRight, Leaf } from 'lucide-react';
 import { SortFilter } from '@/lib/types';
 
 interface Props {
@@ -14,6 +14,7 @@ const OPTIONS: { value: SortFilter; label: string; Icon: React.ElementType }[] =
   { value: 'cheap',     label: 'Cheapest',  Icon: DollarSign     },
   { value: 'fast',      label: 'Fastest',   Icon: Zap            },
   { value: 'transfers', label: 'Transfers', Icon: ArrowLeftRight },
+  { value: 'eco',       label: 'Eco',       Icon: Leaf           },
 ];
 
 export default function FilterBar({ value, onChange, count }: Props) {

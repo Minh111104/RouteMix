@@ -1,4 +1,4 @@
-import { Car, Bus, Plane, Navigation, PersonStanding, Train } from 'lucide-react';
+import { Car, Bus, Plane, Navigation, PersonStanding, Train, Leaf } from 'lucide-react';
 import { ComposedRoute, RouteSegment, TransportMode } from '@/lib/types';
 
 function formatDuration(minutes: number): string {
@@ -28,10 +28,15 @@ const MODE_CONFIG: Record<
 };
 
 const TAG_CONFIG: Record<string, { label: string; className: string }> = {
-  cheapest:   { label: 'Cheapest',   className: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'   },
-  fastest:    { label: 'Fastest',    className: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'       },
-  best_value: { label: 'Best value', className: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400' },
+  cheapest:   { label: 'Cheapest',    className: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'     },
+  fastest:    { label: 'Fastest',     className: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'         },
+  best_value: { label: 'Best value',  className: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400' },
+  lowest_co2: { label: '🌿 Lowest CO₂', className: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' },
 };
+
+function formatCO2(kg: number): string {
+  return kg < 1 ? `${Math.round(kg * 1000)} g CO₂` : `${kg.toFixed(1)} kg CO₂`;
+}
 
 function SegmentRow({ seg, isLast }: { seg: RouteSegment; isLast: boolean }) {
   const cfg = MODE_CONFIG[seg.mode];
@@ -60,6 +65,12 @@ function SegmentRow({ seg, isLast }: { seg: RouteSegment; isLast: boolean }) {
           <span>{formatDuration(seg.duration_minutes)}</span>
           {seg.cost_usd > 0 && <span>{formatCost(seg.cost_usd)}</span>}
           {seg.distance_km && <span>{seg.distance_km} km</span>}
+          {seg.co2_kg != null && (
+            <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+              <Leaf className="w-3 h-3" />
+              {formatCO2(seg.co2_kg)}
+            </span>
+          )}
           {seg.departure_time && <span>{seg.departure_time}</span>}
           {seg.notes && <span className="text-gray-300 dark:text-gray-600">{seg.notes}</span>}
         </p>
@@ -127,6 +138,12 @@ export default function RouteCard({ route, rank, isActive, onMouseEnter, onMouse
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{formatDuration(route.total_duration_minutes)}</p>
             {route.transfers > 0 && (
               <p className="text-xs text-gray-400 dark:text-gray-500">{route.transfers} transfer{route.transfers > 1 ? 's' : ''}</p>
+            )}
+            {route.total_co2_kg != null && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-0.5 mt-0.5">
+                <Leaf className="w-3 h-3" />
+                {formatCO2(route.total_co2_kg)}
+              </p>
             )}
           </div>
         </div>
