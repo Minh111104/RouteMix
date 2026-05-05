@@ -1,6 +1,6 @@
 export type TransportMode = 'drive' | 'transit' | 'flight' | 'walk' | 'rideshare' | 'train' | 'bus';
 export type Preference = 'cheap' | 'fast' | 'balanced';
-export type SortFilter = 'all' | 'cheap' | 'fast' | 'transfers';
+export type SortFilter = 'all' | 'cheap' | 'fast' | 'transfers' | 'eco';
 
 export interface Coords {
   lat: number;
@@ -21,6 +21,7 @@ export interface RouteSegment {
   from_coords?: Coords;
   to_coords?: Coords;
   polyline?: string;
+  co2_kg?: number;
 }
 
 export interface ComposedRoute {
@@ -32,6 +33,7 @@ export interface ComposedRoute {
   transfers: number;
   score?: number;
   tags: string[];
+  total_co2_kg?: number;
 }
 
 export interface SearchRequest {

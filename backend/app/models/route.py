@@ -39,6 +39,7 @@ class RouteSegment(BaseModel):
     from_coords: Optional[Coords] = None
     to_coords: Optional[Coords] = None
     polyline: Optional[str] = None
+    co2_kg: Optional[float] = None
 
 
 class ComposedRoute(BaseModel):
@@ -50,6 +51,7 @@ class ComposedRoute(BaseModel):
     transfers: int
     score: Optional[float] = None
     tags: List[str] = Field(default_factory=list)
+    total_co2_kg: Optional[float] = None
 
 
 class SearchRequest(BaseModel):

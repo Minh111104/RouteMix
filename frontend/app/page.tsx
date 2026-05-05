@@ -18,6 +18,7 @@ function sortRoutes(routes: ComposedRoute[], filter: SortFilter): ComposedRoute[
   if (filter === 'cheap') return copy.sort((a, b) => a.total_cost_usd - b.total_cost_usd);
   if (filter === 'fast') return copy.sort((a, b) => a.total_duration_minutes - b.total_duration_minutes);
   if (filter === 'transfers') return copy.sort((a, b) => a.transfers - b.transfers);
+  if (filter === 'eco') return copy.sort((a, b) => (a.total_co2_kg ?? Infinity) - (b.total_co2_kg ?? Infinity));
   return copy;
 }
 

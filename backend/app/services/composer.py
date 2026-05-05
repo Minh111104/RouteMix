@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from typing import List, Optional, Tuple
 
 from app.models.route import ComposedRoute, Coords, RouteSegment, SearchRequest, TransportMode
@@ -10,6 +11,17 @@ from app.services.google_routes import geocode_address, get_driving_route, get_t
 from app.services.serpapi import search_flights
 
 logger = logging.getLogger(__name__)
+
+# CO2 emission factors — grams per passenger-km (IPCC / EPA / EEA)
+_CO2_G_PER_KM: dict = {
+    "drive":     171,   # avg gasoline car, solo driver
+    "transit":    89,   # US avg city bus
+    "train":      35,   # Amtrak avg (mix of diesel + electric)
+    "bus":        68,   # intercity bus (Greyhound / FlixBus)
+    "rideshare": 171,   # same emissions as solo car
+    "walk":        0,
+    # flight handled separately (distance-dependent)
+}
 
 _RIDESHARE_COST_PER_KM = 1.50
 _RIDESHARE_SPEED_KMH = 40
@@ -379,7 +391,6 @@ async def _build_fly_routes(
 
 
 async def _build_multistop_drive(
-    cities: List[str],
     pairs: List[tuple],
     drive_legs: List[Optional[dict]],
     coords_map: dict,
@@ -413,7 +424,6 @@ async def _build_multistop_drive(
 
 
 async def _build_multistop_train(
-    cities: List[str],
     pairs: List[tuple],
     coords_map: dict,
     drive_legs: List[Optional[dict]],
@@ -451,7 +461,6 @@ async def _build_multistop_train(
 
 
 async def _build_multistop_bus(
-    cities: List[str],
     pairs: List[tuple],
     coords_map: dict,
     drive_legs: List[Optional[dict]],
@@ -513,7 +522,6 @@ async def _compose_multistop(
     cities: List[str],
     request: "SearchRequest",
     google_key: str,
-    serpapi_key: str,
 ) -> List[ComposedRoute]:
     pairs = list(zip(cities, cities[1:]))
 
@@ -529,9 +537,9 @@ async def _compose_multistop(
     drive_legs = [None if isinstance(r, Exception) else r for r in drive_results]
 
     results = await asyncio.gather(
-        _build_multistop_drive(cities, pairs, drive_legs, coords_map),
-        _build_multistop_train(cities, pairs, coords_map, drive_legs),
-        _build_multistop_bus(cities, pairs, coords_map, drive_legs, request.departure_time),
+        _build_multistop_drive(pairs, drive_legs, coords_map),
+        _build_multistop_train(pairs, coords_map, drive_legs),
+        _build_multistop_bus(pairs, coords_map, drive_legs, request.departure_time),
         return_exceptions=True,
     )
 
@@ -542,7 +550,7 @@ async def _compose_multistop(
         elif result is not None:
             routes.append(result)
 
-    return _score_and_tag(routes, request.preference)
+    return _annotate_co2(_score_and_tag(routes, request.preference))
 
 
 def _score_and_tag(routes: List[ComposedRoute], preference: str) -> List[ComposedRoute]:
@@ -582,6 +590,51 @@ def _score_and_tag(routes: List[ComposedRoute], preference: str) -> List[Compose
     return routes
 
 
+def _flight_km(seg: "RouteSegment") -> Optional[float]:
+    if seg.distance_km:
+        return seg.distance_km
+    if seg.from_coords and seg.to_coords:
+        c1, c2 = seg.from_coords, seg.to_coords
+        dlat = math.radians(c2.lat - c1.lat)
+        dlon = math.radians(c2.lon - c1.lon)
+        a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(c1.lat)) * math.cos(math.radians(c2.lat)) * math.sin(dlon / 2) ** 2
+        return 6371.0 * 2 * math.asin(math.sqrt(a))
+    return None
+
+
+def _segment_co2(seg: "RouteSegment") -> Optional[float]:
+    if seg.mode.value == "flight":
+        km = _flight_km(seg)
+        if km is None:
+            return None
+        g_per_km = 255 if km < 1500 else 195
+        return round(km * g_per_km / 1000, 2)
+    g_per_km = _CO2_G_PER_KM.get(seg.mode.value)
+    if g_per_km is None or seg.distance_km is None:
+        return None
+    return round(seg.distance_km * g_per_km / 1000, 2)
+
+
+def _annotate_co2(routes: "List[ComposedRoute]") -> "List[ComposedRoute]":
+    for route in routes:
+        total = 0.0
+        complete = True
+        for seg in route.segments:
+            co2 = _segment_co2(seg)
+            seg.co2_kg = co2
+            if co2 is None:
+                complete = False
+            else:
+                total += co2
+        route.total_co2_kg = round(total, 2) if complete else None
+
+    with_co2 = [r for r in routes if r.total_co2_kg is not None]
+    if with_co2:
+        min(with_co2, key=lambda r: r.total_co2_kg).tags.append("lowest_co2")  # type: ignore[arg-type]
+
+    return routes
+
+
 async def compose_routes(
     request: SearchRequest,
     google_key: str,
@@ -590,7 +643,7 @@ async def compose_routes(
     waypoints = [w.strip() for w in (request.waypoints or []) if w.strip()]
     if waypoints:
         cities = [request.origin, *waypoints, request.destination]
-        return await _compose_multistop(cities, request, google_key, serpapi_key)
+        return await _compose_multistop(cities, request, google_key)
 
     # Geocode + fetch driving route once — reused by drive/train/bus builders
     origin_coords, dest_coords, driving_data = await asyncio.gather(
@@ -635,4 +688,4 @@ async def compose_routes(
         elif result is not None:
             routes.append(result)
 
-    return _score_and_tag(routes, request.preference)
+    return _annotate_co2(_score_and_tag(routes, request.preference))
