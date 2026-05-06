@@ -12,7 +12,11 @@ Most apps show you one mode at a time. RouteMix builds **all viable itineraries*
 - Intercity bus via FlixBus (live fares when available, estimate fallback)
 - Public transit end-to-end (where Google has schedule data)
 
-Each route is scored with a weighted formula across cost, time, and transfers — and you can re-sort results client-side without a new search. Any search can be shared as a URL that re-runs the exact same query when opened.
+Each route is scored with a weighted formula across cost, time, and transfers — and you can re-sort results client-side without a new search. Additional features:
+
+- **Multi-stop / road-trip mode** — add up to 4 intermediate waypoints; the composer stitches drive, train, and bus segments across every consecutive pair
+- **Carbon footprint** — every route shows estimated CO₂ in kg; sort by Eco to find the greenest option
+- **Shareable URLs** — any search is encoded in the URL and re-runs automatically when the link is opened
 
 ## Tech stack
 
@@ -187,9 +191,24 @@ Weights by priority preset:
 | Save time | 0.1 | 0.8 | 0.1 |
 | Balanced | 0.4 | 0.4 | 0.2 |
 
-### Multi-stop
+### Multi-stop / waypoints
 
-Users are able to add/remove various stops in their journeys to find optimal routes.
+The search form accepts up to 4 intermediate stops between origin and destination. The composer builds city pairs from the full list `[origin, stop1, …, destination]`, fetches each leg in parallel, and stitches them into combined drive, train, and bus routes. Fly routes are not included in multi-stop mode. Intermediate stop markers (purple) are rendered on the map alongside the standard origin (blue) and destination (green) pins. Waypoints are encoded in the URL as `stops=City1|City2` and restored automatically from shared links.
+
+### Carbon footprint
+
+Each segment is annotated with a CO₂ estimate (grams per passenger-km) using published IPCC / EPA factors:
+
+| Mode | g CO₂ / km |
+| ---- | ---------- |
+| Drive / Rideshare | 171 |
+| Transit bus | 89 |
+| Intercity bus | 68 |
+| Train (Amtrak) | 35 |
+| Flight < 1 500 km | 255 (incl. radiative forcing) |
+| Flight ≥ 1 500 km | 195 |
+
+Per-segment CO₂ appears inline in each route card. The route with the lowest total CO₂ is tagged **🌿 Lowest CO₂**. The **Eco** sort button in the filter bar re-orders results by ascending carbon footprint.
 
 ### Map visualization
 
