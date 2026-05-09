@@ -66,3 +66,21 @@ class SearchResponse(BaseModel):
     routes: List[ComposedRoute]
     recommendation: Optional[str] = None
     search_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+
+class FlexibleDatesRequest(BaseModel):
+    origin: str
+    destination: str
+    center_date: str  # YYYY-MM-DD
+
+
+class DateOption(BaseModel):
+    date: str
+    min_flight_usd: Optional[float] = None
+    min_bus_usd: Optional[float] = None
+
+
+class FlexibleDatesResponse(BaseModel):
+    dates: List[DateOption]
+    origin_iata: Optional[str] = None
+    dest_iata: Optional[str] = None

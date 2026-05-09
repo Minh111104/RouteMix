@@ -1,8 +1,14 @@
 from fastapi import APIRouter, HTTPException
 
 from app.config import settings
-from app.models.route import SearchRequest, SearchResponse
+from app.models.route import (
+    FlexibleDatesRequest,
+    FlexibleDatesResponse,
+    SearchRequest,
+    SearchResponse,
+)
 from app.services.composer import compose_routes
+from app.services.flexible_dates import get_flexible_dates
 from app.services.recommend import generate_recommendation
 
 router = APIRouter(prefix="/api", tags=["routes"])
@@ -33,3 +39,18 @@ async def compose(request: SearchRequest) -> SearchResponse:
     )
 
     return SearchResponse(routes=routes, recommendation=recommendation or None)
+
+
+@router.post("/flexible-dates", response_model=FlexibleDatesResponse)
+async def flexible_dates(request: FlexibleDatesRequest) -> FlexibleDatesResponse:
+    if not request.origin.strip() or not request.destination.strip():
+        raise HTTPException(status_code=400, detail="Origin and destination are required")
+
+    result = await get_flexible_dates(
+        origin=request.origin,
+        destination=request.destination,
+        center_date=request.center_date,
+        google_key=settings.google_routes_api_key,
+        serpapi_key=settings.serpapi_key,
+    )
+    return FlexibleDatesResponse(**result)
