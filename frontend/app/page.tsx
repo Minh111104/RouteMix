@@ -7,9 +7,10 @@ import { Link, Check } from 'lucide-react';
 import SearchForm from '@/components/SearchForm';
 import RouteCard from '@/components/RouteCard';
 import FilterBar from '@/components/FilterBar';
+import FlexibleDatePicker from '@/components/FlexibleDatePicker';
 import ThemeToggle from '@/components/ThemeToggle';
-import { searchRoutes } from '@/lib/api';
-import { ComposedRoute, Preference, SearchRequest, SortFilter } from '@/lib/types';
+import { searchRoutes, getFlexibleDates } from '@/lib/api';
+import { ComposedRoute, DateOption, Preference, SearchRequest, SortFilter } from '@/lib/types';
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -47,6 +48,9 @@ function HomeContent() {
   const [filter, setFilter] = useState<SortFilter>('all');
   const [activeRouteType, setActiveRouteType] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [flexDates, setFlexDates] = useState<DateOption[]>([]);
+  const [flexLoading, setFlexLoading] = useState(false);
+  const lastReq = useRef<SearchRequest | null>(null);
   const autoSearched = useRef(false);
 
   // Derive initial form values from URL params
@@ -74,10 +78,13 @@ function HomeContent() {
     if (filteredWaypoints.length) params.set('stops', filteredWaypoints.join('|'));
     router.replace(`?${params.toString()}`, { scroll: false });
 
+    lastReq.current = req;
     setLoading(true);
     setError(null);
     setRoutes([]);
     setRecommendation(null);
+    setFlexDates([]);
+    setFlexLoading(false);
     setFilter('all');
     setActiveRouteType(null);
     try {
@@ -85,11 +92,24 @@ function HomeContent() {
       setRoutes(data.routes);
       setRecommendation(data.recommendation ?? null);
       setSearched(true);
+
+      // Fetch flexible dates in the background — don't block main results
+      setFlexLoading(true);
+      getFlexibleDates(req.origin, req.destination, req.departure_time.slice(0, 10))
+        .then(fd => setFlexDates(fd.dates))
+        .catch(() => {})
+        .finally(() => setFlexLoading(false));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleDateSelect(newDate: string) {
+    if (!lastReq.current) return;
+    const time = lastReq.current.departure_time.slice(11, 16);
+    handleSearch({ ...lastReq.current, departure_time: `${newDate}T${time}:00` });
   }
 
   // Auto-fire search when URL params are present on first load
@@ -202,8 +222,18 @@ function HomeContent() {
                   </div>
                 )}
 
+                {/* Flexible date picker */}
+                {(flexLoading || flexDates.length > 0) && lastReq.current && (
+                  <FlexibleDatePicker
+                    dates={flexDates}
+                    selectedDate={lastReq.current.departure_time.slice(0, 10)}
+                    onSelect={handleDateSelect}
+                    loading={flexLoading}
+                  />
+                )}
+
                 {/* Stats bar */}
-                <div className={`${recommendation ? 'mt-4' : 'mt-8'} mb-4 flex flex-wrap gap-4 items-center justify-between`}>
+                <div className={`${recommendation || flexDates.length > 0 || flexLoading ? 'mt-4' : 'mt-8'} mb-4 flex flex-wrap gap-4 items-center justify-between`}>
                   <div className="flex items-center gap-6">
                     <div>
                       <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">Routes found</p>
