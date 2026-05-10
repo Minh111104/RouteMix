@@ -49,3 +49,15 @@ export interface SearchResponse {
   recommendation?: string;
   search_id: string;
 }
+
+export interface DateOption {
+  date: string;           // YYYY-MM-DD
+  min_flight_usd: number | null;
+  min_bus_usd: number | null;
+}
+
+export interface FlexibleDatesResponse {
+  dates: DateOption[];
+  origin_iata: string | null;
+  dest_iata: string | null;
+}
