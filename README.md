@@ -241,6 +241,8 @@ The UI supports light and dark mode. The preference is saved in `localStorage` a
 - Transit fare data from Google is often unavailable for long-distance routes — the app shows "Fare unavailable" in that case
 - Google Transit 400 errors on cross-country routes are expected (no connected network) and logged at DEBUG level only
 
+## Select Date picker
+
 ## License
 
 This project is made for educational purposes.
