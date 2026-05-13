@@ -17,11 +17,12 @@ Each route is scored with a weighted formula across cost, time, and transfers �
 - **Multi-stop / road-trip mode** — add up to 4 intermediate waypoints; the composer stitches drive, train, and bus segments across every consecutive pair
 - **Carbon footprint** — every route shows estimated CO₂ in kg; sort by Eco to find the greenest option
 - **Shareable URLs** — any search is encoded in the URL and re-runs automatically when the link is opened
+- **Flexible dates** — a ±3 day price grid shows the cheapest flight and bus fare for each nearby date so you can pick the best travel day without re-searching
 
 ## Tech stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
 | Backend | FastAPI (Python), uvicorn |
 | Routing | Google Routes API (driving + transit polylines) |
@@ -34,14 +35,14 @@ Each route is scored with a weighted formula across cost, time, and transfers �
 
 ## Project structure
 
-```
+```text
 RouteMix/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py                  # FastAPI app + CORS
 │   │   ├── config.py                # loads .env keys
 │   │   ├── models/route.py          # Pydantic models
-│   │   ├── routers/compose.py       # POST /api/compose
+│   │   ├── routers/compose.py       # POST /api/compose + POST /api/flexible-dates
 │   │   └── services/
 │   │       ├── composer.py          # route composition + scoring engine
 │   │       ├── google_routes.py     # driving, transit, geocoding + polylines
@@ -49,6 +50,7 @@ RouteMix/
 │   │       ├── airports.py          # nearest commercial airport finder
 │   │       ├── amtrak.py            # Amtrak corridor-aware train estimates
 │   │       ├── flixbus.py           # FlixBus live bus search
+│   │       ├── flexible_dates.py    # ±3 day price grid (flights + buses)
 │   │       ├── amadeus.py           # Amadeus flight API (alternative to Serpapi)
 │   │       └── recommend.py         # AI route recommendation
 │   ├── requirements.txt
@@ -59,15 +61,16 @@ RouteMix/
     │   ├── page.tsx                 # hero, search, results layout
     │   └── globals.css
     ├── components/
-    │   ├── SearchForm.tsx           # origin / destination / date / time inputs
+    │   ├── SearchForm.tsx           # origin / destination / waypoints / date / time inputs
     │   ├── RouteCard.tsx            # timeline-style segment breakdown per route
-    │   ├── FilterBar.tsx            # client-side sort controls
+    │   ├── FilterBar.tsx            # client-side sort controls (including Eco)
+    │   ├── FlexibleDatePicker.tsx   # ±3 day price grid pill selector
     │   ├── MapView.tsx              # interactive Leaflet map with real polylines
     │   ├── ThemeProvider.tsx        # applies saved dark/light preference on load
     │   └── ThemeToggle.tsx          # sun/moon button in the hero header
     ├── lib/
     │   ├── types.ts                 # shared TypeScript types (mirrors Pydantic models)
-    │   └── api.ts                   # fetch wrapper for backend /api/compose
+    │   └── api.ts                   # fetch wrappers for /api/compose and /api/flexible-dates
     └── .env.local.example
 ```
 
@@ -152,9 +155,9 @@ The `$200/month` free credit covers heavy development usage.
 
 1. Sign up at [serpapi.com](https://serpapi.com)
 2. Copy your API key from the dashboard
-3. Free tier: **100 searches/month** — enough for development and demos
+3. Free tier: **100 searches/month** — each main search uses 1 call; the flexible date grid uses up to 7 additional calls (one per date), so budget accordingly for development
 
-> The app works with just the Google key. If `SERPAPI_KEY` is empty, flight routes are silently skipped and only ground routes are returned.
+> The app works with just the Google key. If `SERPAPI_KEY` is empty, flight routes and flexible date flight prices are silently skipped and only ground routes are returned.
 
 ## How it works
 
@@ -177,7 +180,7 @@ The `$200/month` free credit covers heavy development usage.
 
 Each route is scored:
 
-```
+```text
 score = cost_weight × (cost / max_cost)
       + time_weight × (time / max_time)
       + transfer_weight × (transfers / 3)
@@ -186,7 +189,7 @@ score = cost_weight × (cost / max_cost)
 Weights by priority preset:
 
 | Preset | Cost | Time | Transfers |
-|--------|------|------|-----------|
+| ------ | ---- | ---- | --------- |
 | Save money | 0.7 | 0.2 | 0.1 |
 | Save time | 0.1 | 0.8 | 0.1 |
 | Balanced | 0.4 | 0.4 | 0.2 |
@@ -210,12 +213,24 @@ Each segment is annotated with a CO₂ estimate (grams per passenger-km) using p
 
 Per-segment CO₂ appears inline in each route card. The route with the lowest total CO₂ is tagged **🌿 Lowest CO₂**. The **Eco** sort button in the filter bar re-orders results by ascending carbon footprint.
 
+### Flexible dates
+
+After a search completes, the app fetches prices for the 3 days before and 3 days after the selected date in the background without blocking the main results. The `POST /api/flexible-dates` endpoint geocodes the origin and destination once, resolves the nearest airport pair, then fires up to 7 parallel searches (one Serpapi flight search + one FlixBus query per date). Results are returned as a list of `DateOption` objects, each carrying the cheapest flight price and cheapest bus price found for that date.
+
+The `FlexibleDatePicker` component renders these as a horizontally-scrollable row of date pills:
+
+- The cheapest overall date is highlighted in **emerald** and labeled **Best**
+- The currently-selected date is highlighted in **sky blue**
+- Past dates are dimmed and non-clickable
+- Each pill shows the best available price with a plane or bus icon
+- Clicking a pill re-runs the full search for that date
+
 ### Map visualization
 
 Routes are drawn as color-coded polylines on an OpenStreetMap base layer. Drive and transit segments use the real encoded polyline from Google Routes API; flight segments use a dashed straight line; train and bus use a straight line to indicate they are estimates.
 
 | Mode | Color | Line style |
-|------|-------|------------|
+| ---- | ----- | ---------- |
 | Drive | Blue | Road-following polyline |
 | Transit | Green | Road/rail-following polyline |
 | Train | Teal | Straight line (estimate) |
@@ -240,8 +255,7 @@ The UI supports light and dark mode. The preference is saved in `localStorage` a
 - Serpapi uses sandbox/live data depending on your account tier
 - Transit fare data from Google is often unavailable for long-distance routes — the app shows "Fare unavailable" in that case
 - Google Transit 400 errors on cross-country routes are expected (no connected network) and logged at DEBUG level only
-
-## Select Date picker
+- Flexible date prices load in the background after the main results appear; if `SERPAPI_KEY` is not set the date pills show `—` for flight prices but still display FlixBus prices where available
 
 ## License
 
